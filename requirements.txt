@@ -1,15 +1,10 @@
     langchain
     python-dotenv  
     langchain-community
-    langchain-text-splitters
     faiss-cpu
     langchain_groq
-    sentence_transformers
     langchain_huggingface
     sentence_transformers 
-    pypdf
-    pymupdf
-    huggingface_hub
     fastapi
     uvicorn
     python-multipart
