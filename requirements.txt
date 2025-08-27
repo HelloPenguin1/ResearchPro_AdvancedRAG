@@ -3,8 +3,7 @@
     langchain-community
     faiss-cpu
     langchain_groq
-    langchain_huggingface
-    sentence_transformers 
+    langchain_huggingface 
     fastapi
     uvicorn
     python-multipart
