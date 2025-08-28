@@ -7,4 +7,4 @@
     fastapi
     uvicorn
     python-multipart
-
+    sentence-transformers

@@ -1,7 +1,7 @@
 from langchain.chains import RetrievalQA
 
 class RAG_Pipeline:
-    def init(self, llm , vectorstore=None):
+    def __init__(self, llm , vectorstore=None):
         self.llm = llm
         self.vectorstore = vectorstore
 
@@ -16,3 +16,7 @@ class RAG_Pipeline:
         chain = RetrievalQA.from_llm(llm = self.llm,
                                      retriever = retriever)
         return chain.run(question)      
+    
+
+
+
