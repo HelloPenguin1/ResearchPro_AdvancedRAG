@@ -8,3 +8,7 @@
     uvicorn
     python-multipart
     sentence-transformers
+    unstructured
+    pytesseract
+    unstructured[pdf]
+    rank_bm25

@@ -1,18 +1,30 @@
 from langchain.chains import RetrievalQA
+from langchain.retrievers import EnsembleRetriever
+
 
 class RAG_Pipeline:
     def __init__(self, llm , vectorstore=None):
         self.llm = llm
         self.vectorstore = vectorstore
+        self.hybrid_retriever = None
+
 
     def update_vectorstore(self, vectorstore):
         self.vectorstore = vectorstore
 
-    def query(self, question: str):
-        if not self.vectorstore:
-            return "No documents uploaded"
 
-        retriever = self.vectorstore.as_retriever()  
+    def create_hybrid_retriever(self, syntactic_retriever, semantic_retriever):
+        self.hybrid_retriever = EnsembleRetriever(retrievers = [syntactic_retriever, semantic_retriever],
+                                             weights = [0.6,0.4])
+
+        return self.hybrid_retriever
+    
+
+    def query(self, question: str):
+        if not self.vectorstore or not self.hybrid_retriever:
+            return "No documents uploaded or hybrid retriever not initialized"
+
+        retriever = self.hybrid_retriever  
         chain = RetrievalQA.from_llm(llm = self.llm,
                                      retriever = retriever)
         return chain.run(question)      

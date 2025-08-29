@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from typing import Annotated
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from config import llm, hf_embeddings
 from document_process import DocumentProcessor
 from rag_pipeline import RAG_Pipeline
+import os
 
 
 class QueryRequest(BaseModel): 
@@ -23,13 +24,13 @@ app.state.vectorstore = None
 
 #Instantiate classes
 document_processor = DocumentProcessor(hf_embeddings)
-rag_pipeline = RAG_Pipeline(llm, app.state.vectorstore)
+rag_pipeline = RAG_Pipeline(llm)
 
 
 @app.get("/")
 async def root():
     return {
-        "message": "Welcome to the RAG API pra ctice",
+        "message": "Welcome to the Advanced Research Assistant",
         "endpoints": {
             "POST /upload_file": "Upload a document for processing",
             "POST /query": "Query the uploaded documents"
@@ -39,26 +40,64 @@ async def root():
     
 ## API endpoint for uplaoding docs
 @app.post('/upload_file')
-async def upload_file(file: Annotated[UploadFile, File(description="Upload a text document to process")]):
-    text = await file.read()
-    text=text.decode('utf-8', errors = "ignore")
+async def upload_file(file: Annotated[UploadFile, File(description="Upload a text document to process")]): 
+    temp_file_path = None
+    try:
+        if not os.path.exists("temp"):
+            os.makedirs("temp")
 
-    chunks = document_processor.process_text(text)
-    rag_pipeline.update_vectorstore(document_processor.vectorstore)
+        temp_file_path = os.path.join("temp", f"temp_{file.filename}")
+        with open(temp_file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
 
-    return {"Message": "File uploaded successfully",
-            "Chunks": chunks}
+        # Load and process document
+        docs = document_processor.load_pdf(temp_file_path)
+        chunks = document_processor.process_pdf(docs)
+
+        # Create retrievers
+        syntactic_retriever = document_processor.syntactic_retriever(chunks)
+        semantic_retriever = document_processor.semantic_retriever(chunks, hf_embeddings)
+        rag_pipeline.create_hybrid_retriever(syntactic_retriever, semantic_retriever)
+       
+        # Update vectorstore
+        if document_processor.vectorstore:
+            rag_pipeline.update_vectorstore(document_processor.vectorstore)
+        else:
+            raise HTTPException(status_code=500, detail="Vectorstore initialization failed")
+
+        # Verify state
+        if not rag_pipeline.vectorstore or not rag_pipeline.hybrid_retriever:
+            raise HTTPException(status_code=500, detail="Failed to initialize retrievers")
+
+        # Cleanup
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
+        return {"message": "File uploaded and retriever initialized successfully"}
+    
+    except HTTPException as he:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        raise he
+    except Exception as e:
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
     
 
 ## API endpoint for querying the retriever
 @app.post('/query')
 async def query_rag(query: QueryRequest):
-    result = rag_pipeline.query(query.query)
-    return {"response": result}
-
+    try:
+        result = rag_pipeline.query(query.query)
+        return {"response": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
 @app.delete('/delete')
 async def deletevectorstore():
     rag_pipeline.vectorstore = None
     document_processor.vectorstore = None
+    rag_pipeline.hybrid_retriever = None
     return {"Message": "Vectorstore cleared"}
