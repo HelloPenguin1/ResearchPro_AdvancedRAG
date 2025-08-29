@@ -3,7 +3,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import UnstructuredPDFLoader
 import nltk
 from nltk.tokenize import word_tokenize
-from langchain.retrievers import BM25Retriever
+from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
 
 

@@ -74,7 +74,7 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
 
         # Verify state
         if not rag_pipeline.vectorstore or not rag_pipeline.hybrid_retriever:
-            raise HTTPException(status_code=500, detail="Failed to initialize retrievers")
+            raise HTTPException(status_code=500, detail="Failed to initialize retriever")
 
         # Cleanup
         if temp_file_path and os.path.exists(temp_file_path):
@@ -106,6 +106,6 @@ async def deletevectorstore():
     rag_pipeline.vectorstore = None
     document_processor.vectorstore = None
     rag_pipeline.hybrid_retriever = None
-    rag_pipeline.compression_retriever = None  # Add this line
+    rag_pipeline.compression_retriever = None  
 
     return {"Message": "Vectorstore cleared"}
