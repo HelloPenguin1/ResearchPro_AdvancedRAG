@@ -14,3 +14,5 @@ hf_embeddings = HuggingFaceEmbeddings(
 
 llm = ChatGroq(model="llama-3.1-8b-instant", 
                groq_api_key=groq_api_key)
+
+hf_reranker_encoder = "cross-encoder/ms-marco-MiniLM-L-6-v2"

@@ -1,11 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from typing import Annotated
 from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
 from pydantic import BaseModel
 from config import llm, hf_embeddings
 from document_process import DocumentProcessor
 from rag_pipeline import RAG_Pipeline
+from postRetrievalReranker import ReRanker_Model
+from config import hf_reranker_encoder
 import os
 
 
@@ -20,11 +21,11 @@ app = FastAPI(
     version="1.2.0"
 )
 
-app.state.vectorstore = None
 
 #Instantiate classes
 document_processor = DocumentProcessor(hf_embeddings)
 rag_pipeline = RAG_Pipeline(llm)
+reranker = ReRanker_Model(hf_reranker_encoder)
 
 
 @app.get("/")
@@ -58,7 +59,12 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         # Create retrievers
         syntactic_retriever = document_processor.syntactic_retriever(chunks)
         semantic_retriever = document_processor.semantic_retriever(chunks, hf_embeddings)
-        rag_pipeline.create_hybrid_retriever(syntactic_retriever, semantic_retriever)
+        hybrid_retriever = rag_pipeline.create_hybrid_retriever(syntactic_retriever, semantic_retriever)
+
+
+        compression_retriever = reranker.create_compression_retriever(hybrid_retriever)
+        rag_pipeline.set_compression_retriever(compression_retriever)
+       
        
         # Update vectorstore
         if document_processor.vectorstore:
@@ -100,4 +106,6 @@ async def deletevectorstore():
     rag_pipeline.vectorstore = None
     document_processor.vectorstore = None
     rag_pipeline.hybrid_retriever = None
+    rag_pipeline.compression_retriever = None  # Add this line
+
     return {"Message": "Vectorstore cleared"}

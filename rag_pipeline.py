@@ -7,11 +7,10 @@ class RAG_Pipeline:
         self.llm = llm
         self.vectorstore = vectorstore
         self.hybrid_retriever = None
-
+        self.compression_retriever = None
 
     def update_vectorstore(self, vectorstore):
         self.vectorstore = vectorstore
-
 
     def create_hybrid_retriever(self, syntactic_retriever, semantic_retriever):
         self.hybrid_retriever = EnsembleRetriever(retrievers = [syntactic_retriever, semantic_retriever],
@@ -19,14 +18,16 @@ class RAG_Pipeline:
 
         return self.hybrid_retriever
     
+    def set_compression_retriever(self, compression_retriever):
+        self.compression_retriever = compression_retriever
+    
 
     def query(self, question: str):
         if not self.vectorstore or not self.hybrid_retriever:
             return "No documents uploaded or hybrid retriever not initialized"
-
-        retriever = self.hybrid_retriever  
+ 
         chain = RetrievalQA.from_llm(llm = self.llm,
-                                     retriever = retriever)
+                                     retriever = self.compression_retriever )
         return chain.run(question)      
     
 
