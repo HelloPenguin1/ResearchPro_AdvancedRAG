@@ -15,7 +15,6 @@ class RAG_Pipeline:
     def create_hybrid_retriever(self, syntactic_retriever, semantic_retriever):
         self.hybrid_retriever = EnsembleRetriever(retrievers = [syntactic_retriever, semantic_retriever],
                                              weights = [0.6,0.4])
-
         return self.hybrid_retriever
     
     def set_compression_retriever(self, compression_retriever):
@@ -33,3 +32,4 @@ class RAG_Pipeline:
 
 
 
+    

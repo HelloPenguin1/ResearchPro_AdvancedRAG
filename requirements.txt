@@ -12,3 +12,6 @@
     pytesseract
     unstructured[pdf]
     rank_bm25
+    tensorflow
+    tf-keras
+    rank_bm25

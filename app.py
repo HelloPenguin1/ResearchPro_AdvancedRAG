@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from typing import Annotated
 from langchain_community.vectorstores import FAISS
 from pydantic import BaseModel
-from config import llm, hf_embeddings
+from config import llm, hyde_embedding
 from document_process import DocumentProcessor
 from rag_pipeline import RAG_Pipeline
 from postRetrievalReranker import ReRanker_Model
@@ -23,9 +23,14 @@ app = FastAPI(
 
 
 #Instantiate classes
-document_processor = DocumentProcessor(hf_embeddings)
+document_processor = DocumentProcessor()
 rag_pipeline = RAG_Pipeline(llm)
 reranker = ReRanker_Model(hf_reranker_encoder)
+
+
+
+
+
 
 
 @app.get("/")
@@ -37,6 +42,8 @@ async def root():
             "POST /query": "Query the uploaded documents"
         }
     }
+
+
 
     
 ## API endpoint for uplaoding docs
@@ -58,10 +65,8 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
 
         # Create retrievers
         syntactic_retriever = document_processor.syntactic_retriever(chunks)
-        semantic_retriever = document_processor.semantic_retriever(chunks, hf_embeddings)
+        semantic_retriever = document_processor.semantic_retriever(chunks, hyde_embedding)
         hybrid_retriever = rag_pipeline.create_hybrid_retriever(syntactic_retriever, semantic_retriever)
-
-
         compression_retriever = reranker.create_compression_retriever(hybrid_retriever)
         rag_pipeline.set_compression_retriever(compression_retriever)
        
@@ -92,6 +97,13 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
     
 
+
+
+
+
+
+
+
 ## API endpoint for querying the retriever
 @app.post('/query')
 async def query_rag(query: QueryRequest):
@@ -100,6 +112,15 @@ async def query_rag(query: QueryRequest):
         return {"response": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
+
+
+
+
+
+
+
+
+
 
 @app.delete('/delete')
 async def deletevectorstore():
