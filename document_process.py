@@ -3,6 +3,8 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import UnstructuredPDFLoader
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
+from langchain.retrievers import ParentDocumentRetriever
+from langchain.storage import InMemoryStore
 
 
 class DocumentProcessor:
@@ -56,14 +58,24 @@ class DocumentProcessor:
         return syntactic_retriever
     
     
+   ## Implement Parent Document Retriever here as semantic retriver
 
+    def create_parent_retriever(self, docs, embeddings):
+        
+        parent_splitter = RecursiveCharacterTextSplitter(chunk_size = 1500, chunk_overlap = 200)
+        child_splitter = RecursiveCharacterTextSplitter(chunk_size = 600, chunk_overlap = 100)
 
-    def semantic_retriever(self, chunks, embeddings):
-       self.vectorstore = FAISS.from_documents(chunks, embedding=embeddings)
-       semantic_retriever = self.vectorstore.as_retriever(search_kwargs={"k": 5})
-       
+        self.vectorstore = FAISS.from_texts(texts=["init"], embedding=embeddings)
 
-       return semantic_retriever
+        parent_retriever = ParentDocumentRetriever(
+            vectorstore=self.vectorstore,
+            docstore = InMemoryStore(),
+            child_splitter=child_splitter,
+            parent_splitter=parent_splitter
+        )
+
+        parent_retriever.add_documents(docs)
+        return parent_retriever
 
     
 

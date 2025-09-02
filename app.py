@@ -65,8 +65,9 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
 
         # Create retrievers
         syntactic_retriever = document_processor.syntactic_retriever(chunks)
-        semantic_retriever = document_processor.semantic_retriever(chunks, hyde_embedding)
+        semantic_retriever = document_processor.create_parent_retriever(docs, hyde_embedding)
         hybrid_retriever = rag_pipeline.create_hybrid_retriever(syntactic_retriever, semantic_retriever)
+        
         compression_retriever = reranker.create_compression_retriever(hybrid_retriever)
         rag_pipeline.set_compression_retriever(compression_retriever)
        
