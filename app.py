@@ -2,13 +2,12 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from typing import Annotated
 from langchain_community.vectorstores import FAISS
 from pydantic import BaseModel
-from config import llm, hyde_embedding
+from config import llm, hyde_embedding, llm_summarize
 from document_process import DocumentProcessor
 from rag_pipeline import RAG_Pipeline
 from postRetrievalReranker import ReRanker_Model
 from config import hf_reranker_encoder
 import os
-
 
 class QueryRequest(BaseModel): 
     query: str
@@ -26,8 +25,6 @@ app = FastAPI(
 document_processor = DocumentProcessor()
 rag_pipeline = RAG_Pipeline(llm)
 reranker = ReRanker_Model(hf_reranker_encoder)
-
-
 
 
 
@@ -86,7 +83,7 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-        return {"message": "File uploaded and retriever initialized successfully"}
+        return {"message": f"File uploaded and retriever initialized successfully."}
     
     except HTTPException as he:
         if temp_file_path and os.path.exists(temp_file_path):
@@ -98,13 +95,6 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
     
 
-
-
-
-
-
-
-
 ## API endpoint for querying the retriever
 @app.post('/query')
 async def query_rag(query: QueryRequest):
@@ -113,13 +103,6 @@ async def query_rag(query: QueryRequest):
         return {"response": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
-
-
-
-
-
-
-
 
 
 

@@ -9,11 +9,11 @@ class ReRanker_Model():
         )
         self.compression_retriever = None
     
-    def create_compression_retriever(self, hybrid_retriever):
+    def create_compression_retriever(self, retriever):
         compressor = CrossEncoderReranker(model=self.rerankermodel,
                                           top_n=5)
         self.compression_retriever =ContextualCompressionRetriever(base_compressor=compressor, 
-                                                              base_retriever=hybrid_retriever)
+                                                              base_retriever=retriever)
         
         return self.compression_retriever
         

@@ -14,7 +14,6 @@ class DocumentProcessor:
 
 
 
-
     def load_pdf(self, filepath:str):
         loader = UnstructuredPDFLoader(
                     file_path=filepath,
@@ -28,9 +27,6 @@ class DocumentProcessor:
         return docs
     
 
-
-
-
     def process_pdf(self, docs):
         splitter = RecursiveCharacterTextSplitter(chunk_size = 800, 
                                                   chunk_overlap = 100,
@@ -41,14 +37,13 @@ class DocumentProcessor:
                                                       " ",
                                                       ""
                                                   ])
-        chunks = splitter.split_documents(docs)
-        return chunks
+        self.chunks = splitter.split_documents(docs)
+        return self.chunks
     
 
 
 
     def syntactic_retriever(self, chunks):
-
         def simple_process(text):
             return text.lower().split()
 
@@ -58,10 +53,7 @@ class DocumentProcessor:
         return syntactic_retriever
     
     
-   ## Implement Parent Document Retriever here as semantic retriver
-
     def create_parent_retriever(self, docs, embeddings):
-        
         parent_splitter = RecursiveCharacterTextSplitter(chunk_size = 1500, chunk_overlap = 200)
         child_splitter = RecursiveCharacterTextSplitter(chunk_size = 600, chunk_overlap = 100)
 
