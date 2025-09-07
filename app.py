@@ -8,16 +8,19 @@ from rag_pipeline import RAG_Pipeline
 from postRetrievalReranker import ReRanker_Model
 from config import hf_reranker_encoder
 import os
+from typing import Optional
+from session_manager import SessionManager
 
 class QueryRequest(BaseModel): 
     query: str
+    session_id: Optional[str] = "default_session"  
 
 
 #initializing fastapi
 app = FastAPI(
     title="RAG API v2",
     description="A simple RAG (Retrieval Augmented Generation) API using modularity",
-    version="1.2.0"
+    version="2.0.0"
 )
 
 
@@ -25,9 +28,7 @@ app = FastAPI(
 document_processor = DocumentProcessor()
 rag_pipeline = RAG_Pipeline(llm)
 reranker = ReRanker_Model(hf_reranker_encoder)
-
-
-
+session_manager= SessionManager()
 
 
 @app.get("/")
@@ -39,8 +40,6 @@ async def root():
             "POST /query": "Query the uploaded documents"
         }
     }
-
-
 
     
 ## API endpoint for uplaoding docs
@@ -74,6 +73,9 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
             rag_pipeline.update_vectorstore(document_processor.vectorstore)
         else:
             raise HTTPException(status_code=500, detail="Vectorstore initialization failed")
+        
+        rag_chain = rag_pipeline.create_rag_chain(compression_retriever)
+        rag_pipeline.create_conversational_chain(rag_chain, session_manager.get_session_history)
 
         # Verify state
         if not rag_pipeline.vectorstore or not rag_pipeline.hybrid_retriever:
@@ -99,7 +101,7 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
 @app.post('/query')
 async def query_rag(query: QueryRequest):
     try:
-        result = rag_pipeline.query(query.query)
+        result = rag_pipeline.query(query.query, query.session_id)
         return {"response": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
@@ -108,9 +110,11 @@ async def query_rag(query: QueryRequest):
 
 @app.delete('/delete')
 async def deletevectorstore():
+    global session_store
     rag_pipeline.vectorstore = None
     document_processor.vectorstore = None
     rag_pipeline.hybrid_retriever = None
     rag_pipeline.compression_retriever = None  
-
+    rag_pipeline.conversational_rag = None  
+    session_manager.st.session_state.store = {} 
     return {"Message": "Vectorstore cleared"}
