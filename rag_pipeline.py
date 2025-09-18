@@ -20,11 +20,15 @@ class RAG_Pipeline:
 
     def create_reformulation_prompt(self):
         reform_sys_prompt = """
-            Given a chat history and a recent user question which might 
-            reference context in the chat history, formulate a standalone
-            question which can be understood without the chat history.
-            DO NOT answer the question. Just reformulate the question if needed
-            else return as it is.
+        You are a research question reformulator.
+        Given the conversation history and the latest user query, rewrite the query 
+        into a clear, self-contained research question. 
+
+        Guidelines:
+        - Preserve the user’s intent.
+        - Expand abbreviations or vague references (e.g., "it", "they") using chat history.
+        - Do NOT answer the question.
+        - If the question is already standalone, return it unchanged.
         """
 
         return ChatPromptTemplate.from_messages([
@@ -36,12 +40,20 @@ class RAG_Pipeline:
 
     def create_answer_prompt(self):
         answer_sys_prompt = """
-            You are an expert research assistant for question answering tasks.
-            Make sure to answer the questions as accurately as possible without 
-            leaving any details using the following retrieved context.
-            Give a complete answer to the question.
+        You are an expert research assistant specialized in providing accurate, 
+        detailed, and well-structured answers based on retrieved documents.
 
-            Context: {context} 
+        Use the following rules:
+        1. Base your answer ONLY on the provided context. If the context does not 
+           contain enough information, clearly say so.
+        2. Provide a complete, well-structured explanation (not just a short answer).
+        3. When applicable, summarize key points, compare perspectives, and provide 
+           nuanced insights.
+        4. Maintain an academic, professional tone suitable for research use.
+        5. Do NOT fabricate references or information.
+
+        Context:
+        {context}
         """
 
         return ChatPromptTemplate.from_messages([

@@ -9,7 +9,6 @@ from langchain.storage import InMemoryStore
 
 class DocumentProcessor:
     def __init__(self):
-        # self.embeddings = embeddings
         self.vectorstore = None
 
 

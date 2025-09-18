@@ -70,6 +70,8 @@ def check_api_health():
     except:
         return False
 
+
+
 # Sidebar for file upload and controls
 with st.sidebar:
     st.title("📚 Research Assistant")
@@ -80,7 +82,7 @@ with st.sidebar:
         st.success("🟢 API Connected")
     else:
         st.error("🔴 API Disconnected")
-        st.warning("Please make sure your FastAPI server is running on http://localhost:8000")
+        st.warning("Please make sure your FastAPI server is active")
     
     st.markdown("---")
     
@@ -93,7 +95,7 @@ with st.sidebar:
     )
     
     if uploaded_file is not None:
-        if st.button("🚀 Process Document", type="primary"):
+        if st.button("Process Document", type="primary"):
             with st.spinner("Uploading and processing document..."):
                 # Read file data
                 file_data = uploaded_file.read()
@@ -104,12 +106,11 @@ with st.sidebar:
                 if response and response.status_code == 200:
                     st.session_state.file_uploaded = True
                     st.session_state.uploaded_filename = uploaded_file.name
-                    st.success(f"✅ Successfully processed: {uploaded_file.name}")
                     st.rerun()
                 elif response:
-                    st.error(f"❌ Error: {response.json().get('detail', 'Unknown error')}")
+                    st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
                 else:
-                    st.error("❌ Failed to connect to API")
+                    st.error("Failed to connect to API")
     
     elif st.session_state.file_uploaded:
         st.success(f"✅ Document ready: {st.session_state.uploaded_filename}")
@@ -117,7 +118,7 @@ with st.sidebar:
     st.markdown("---")
     
     # Session management
-    st.subheader("💬 Chat Session")
+    st.subheader("Chat Session")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -153,14 +154,13 @@ with st.sidebar:
                     st.rerun()
     
     st.markdown("---")
-    st.markdown("### ⚙️ Settings")
     st.text_input("API URL", value=API_BASE_URL, key="api_url", help="FastAPI server URL")
 
 # Main chat interface
-st.title("🤖 Research Assistant Chat")
+st.title("ResearchPro PDF Chat")
 
 if not st.session_state.file_uploaded:
-    st.info("👆 Please upload a PDF document in the sidebar to get started!")
+    st.info("Please upload a PDF document in the sidebar to get started!")
     st.markdown("""
     ### How to use:
     1. **Upload a PDF** research paper or document using the sidebar
@@ -236,7 +236,7 @@ else:
         """)
         
         # Show document info
-        st.info(f"📄 Current document: **{st.session_state.uploaded_filename}**")
+        st.info(f"Current document: **{st.session_state.uploaded_filename}**")
 
 # Footer
 st.markdown("---")
