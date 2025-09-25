@@ -1,8 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from typing import Annotated
-from langchain_community.vectorstores import FAISS
 from pydantic import BaseModel
-from config import llm, hyde_embedding, llm_summarize
+from config import llm, hyde_embedding
 from document_process import DocumentProcessor
 from rag_pipeline import RAG_Pipeline
 from postRetrievalReranker import ReRanker_Model

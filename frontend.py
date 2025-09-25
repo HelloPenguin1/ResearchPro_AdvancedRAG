@@ -107,13 +107,12 @@ with st.sidebar:
                     st.session_state.file_uploaded = True
                     st.session_state.uploaded_filename = uploaded_file.name
                     st.rerun()
+                    st.success(f"✅ Document ready: {st.session_state.uploaded_filename}")
                 elif response:
                     st.error(f"Error: {response.json().get('detail', 'Unknown error')}")
                 else:
                     st.error("Failed to connect to API")
-    
-    elif st.session_state.file_uploaded:
-        st.success(f"✅ Document ready: {st.session_state.uploaded_filename}")
+        
     
     st.markdown("---")
     
@@ -227,7 +226,7 @@ else:
     # Show helpful tips
     if len(st.session_state.chat_messages) == 0:
         st.markdown("""
-        ### 💡 Try asking questions like:
+        ### Try asking questions like:
         - "What is the main topic of this document?"
         - "Can you summarize the key findings?"
         - "What methodology was used in this research?"
@@ -242,7 +241,7 @@ else:
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #888;'>"
-    "🔬 Research Assistant RAG System | API Version | Built with Streamlit & FastAPI"
+    "🔬 Research Assistant RAG System | API Version | Built with FastAPI and advanced RAG methods"
     "</div>", 
     unsafe_allow_html=True
 )
