@@ -84,14 +84,14 @@ with st.sidebar:
         st.error("🔴 API Disconnected")
         st.warning("Please make sure your FastAPI server is active")
     
-    st.markdown("---")
     
     # File upload section
     st.subheader("📄 Upload Document")
     uploaded_file = st.file_uploader(
         "Choose a PDF file",
         type=['pdf'],
-        help="Upload a research paper or document to analyze"
+        help="Upload a research paper or document to analyze",
+        key='file_uploader'
     )
     
     if uploaded_file is not None:
@@ -142,21 +142,20 @@ with st.sidebar:
     # Reset document
     if st.session_state.file_uploaded:
         st.markdown("---")
-        if st.button("🔄 Reset Document", help="Upload a new document"):
-            with st.spinner("Resetting..."):
-                delete_response = delete_vectorstore()
-                if delete_response and delete_response.status_code == 200:
-                    st.session_state.file_uploaded = False
-                    st.session_state.uploaded_filename = ""
-                    st.session_state.chat_messages = []
-                    st.success("Document reset successfully!")
-                    st.rerun()
+        if st.button("🔄 Reset/Delete Vectorstore", 
+                     help="Upload a new document"):
+            delete_response = delete_vectorstore()
+            if delete_response and delete_response.status_code == 200:
+                st.session_state.file_uploaded = False
+                st.session_state.uploaded_filename = ""
+                st.session_state.chat_messages = []
+                st.rerun()
     
     st.markdown("---")
     st.text_input("API URL", value=API_BASE_URL, key="api_url", help="FastAPI server URL")
 
 # Main chat interface
-st.title("ResearchPro PDF Chat")
+st.title("Academia RAG Assistant")
 
 if not st.session_state.file_uploaded:
     st.info("Please upload a PDF document in the sidebar to get started!")
