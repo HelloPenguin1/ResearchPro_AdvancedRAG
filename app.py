@@ -55,16 +55,18 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
             f.write(content)
 
         # Load and process document
-        docs = document_processor.load_pdf(temp_file_path)
-        chunks = document_processor.process_pdf(docs)
+        docs = document_processor.load_and_process_pdf(temp_file_path)
 
         # Create retrievers
-        syntactic_retriever = document_processor.syntactic_retriever(chunks)
-        semantic_retriever = document_processor.create_parent_retriever(docs, hyde_embedding)
+        semantic_retriever, syntactic_retriever = document_processor.create_retrievers(docs)
         hybrid_retriever = rag_pipeline.create_hybrid_retriever(syntactic_retriever, semantic_retriever)
         
         compression_retriever = reranker.create_compression_retriever(hybrid_retriever)
+        
+        
         rag_pipeline.set_compression_retriever(compression_retriever)
+        
+        rag_pipeline.set_document_processor(document_processor)
        
        
         # Update vectorstore
@@ -72,6 +74,8 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
             rag_pipeline.update_vectorstore(document_processor.vectorstore)
         else:
             raise HTTPException(status_code=500, detail="Vectorstore initialization failed")
+        
+        
         
         rag_chain = rag_pipeline.create_rag_chain(compression_retriever)
         rag_pipeline.create_conversational_chain(rag_chain, session_manager.get_session_history)
@@ -109,11 +113,16 @@ async def query_rag(query: QueryRequest):
 
 @app.delete('/delete')
 async def deletevectorstore():
-    global session_store
-    rag_pipeline.vectorstore = None
-    document_processor.vectorstore = None
-    rag_pipeline.hybrid_retriever = None
-    rag_pipeline.compression_retriever = None  
-    rag_pipeline.conversational_rag = None  
-    session_manager.st.session_state.store = {} 
-    return {"Message": "Vectorstore cleared"}
+    """Clear vectorstore and session state"""
+    try:
+        rag_pipeline.vectorstore = None
+        document_processor.vectorstore = None
+        rag_pipeline.hybrid_retriever = None
+        rag_pipeline.compression_retriever = None  
+        rag_pipeline.conversational_rag = None  
+        if hasattr(document_processor, 'extracted_tables'):
+            document_processor.extracted_tables = []
+        session_manager.clear_all_sessions()
+        return {"message": "Vectorstore and sessions cleared"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing vectorstore: {str(e)}")
