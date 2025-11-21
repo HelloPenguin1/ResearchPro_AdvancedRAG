@@ -9,13 +9,28 @@ class DocumentProcessor:
         self.vectorstore = None
         self.multimodal_processor = MultimodalProcessor()
         self.processed_docs = []
+        self.extracted_tables = []
 
     def load_and_process_pdf(self, filepath: str):
-
         self.processed_docs = self.multimodal_processor.load_and_process(filepath)
-        print(f"Generated {len(self.processed_docs)} enriched documents.")
-        
+        self.extracted_tables = self._extract_tables_from_docs(self.processed_docs)
+        print(f"Generated {len(self.processed_docs)} enriched documents with {len(self.extracted_tables)} tables.")
         return self.processed_docs
+    
+    def _extract_tables_from_docs(self, docs):
+        """Extract tables from processed documents for separate indexing"""
+        extracted_tables = []
+        for doc in docs:
+            if doc.metadata.get('has_tables', False):
+                tables = doc.metadata.get('original_tables', [])
+                for table_html in tables:
+                    extracted_tables.append({
+                        'content': table_html,
+                        'html': table_html,
+                        'page_number': doc.metadata.get('page_number', 0),
+                        'source': 'pdf'
+                    })
+        return extracted_tables
 
     def create_retrievers(self, docs):
         """
@@ -42,8 +57,36 @@ class DocumentProcessor:
 
 
 
+    def get_table_context(self, query: str) -> str:
+        """Extract table context relevant to the user query"""
+        if not self.extracted_tables:
+            return ""
+        
+        query_lower = query.lower()
+        relevant_tables = []
+        
+        # Find tables matching query keywords
+        query_words = [word for word in query_lower.split() if len(word) > 3]
+        
+        for table in self.extracted_tables:
+            table_content = table.get('content', '').lower()
+            if any(word in table_content for word in query_words):
+                relevant_tables.append(table)
+        
+        if relevant_tables:
+            context = "\n\n=== RELEVANT TABLES FROM DOCUMENT ===\n"
+            for i, table in enumerate(relevant_tables[:3], 1):
+                page = table.get('page_number', 'unknown')
+                context += f"\n[Table {i} - Page {page}]\n"
+                content = table.get('content', '')[:800]
+                context += f"{content}...\n"
+            return context
+        
+        return ""
+    
     def get_statistics(self) -> dict:
         return {
             "processed_documents": len(self.processed_docs),
+            "extracted_tables": len(self.extracted_tables),
             "vectorstore_ready": self.vectorstore is not None
         }

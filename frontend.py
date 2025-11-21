@@ -40,7 +40,6 @@ def upload_file_to_api(file_data, filename):
 
 
 
-
 def query_api(query_text, session_id):
     """Send query to FastAPI endpoint"""
     try:
@@ -86,7 +85,7 @@ with st.sidebar:
     
     
     # File upload section
-    st.subheader("📄 Upload Document")
+    st.subheader("Upload Document")
     uploaded_file = st.file_uploader(
         "Choose a PDF file",
         type=['pdf'],
@@ -121,12 +120,12 @@ with st.sidebar:
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🔄 New Chat", help="Start a new conversation"):
+        if st.button("New Chat", help="Start a new conversation"):
             st.session_state.chat_messages = []
             st.rerun()
     
     with col2:
-        if st.button("🗑️ Clear All", help="Clear chat and reset"):
+        if st.button("Clear All", help="Clear chat and reset"):
             st.session_state.chat_messages = []
             if st.session_state.file_uploaded:
                 with st.spinner("Clearing vectorstore..."):
@@ -142,7 +141,7 @@ with st.sidebar:
     # Reset document
     if st.session_state.file_uploaded:
         st.markdown("---")
-        if st.button("🔄 Reset/Delete Vectorstore", 
+        if st.button("Reset/Delete Vectorstore", 
                      help="Upload a new document"):
             delete_response = delete_vectorstore()
             if delete_response and delete_response.status_code == 200:

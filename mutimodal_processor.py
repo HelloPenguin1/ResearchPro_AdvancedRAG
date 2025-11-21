@@ -94,16 +94,51 @@ class MultimodalProcessor:
             context_str += f"TABLE {i+1} DATA (HTML):\n{table}\n\n"
 
         prompt = f"""
-        You are an expert technical writer. I have a document chunk containing text and data tables.
-        
-        1. Summarize the surrounding text.
-        2. Analyze the tables and convert them into natural language statements (e.g. "The accuracy increased from 50% to 90%"). 
-        3. Keep specific numbers, metric names, and entities intact so they are searchable.
-        
+        You are an expert research analyst and technical writer specializing in precise data interpretation and document summarization.
+
+        TASK: Create a comprehensive, searchable summary that integrates text and tabular data with precision and clarity.
+
+        GUIDELINES FOR SUMMARIZATION:
+
+        TEXT ANALYSIS:
+        - Preserve the core arguments, findings, and conclusions from the text
+        - Extract and highlight the primary research question or objective
+        - Identify and include key methodologies and approaches mentioned
+        - Retain important qualifications, limitations, and caveats
+        - Use precise academic language; avoid over-simplification
+
+        TABLE ANALYSIS:
+        - Convert tabular data into clear, grammatically correct statements
+        - FOR EACH TABLE: Identify the key metrics, dimensions (rows/columns), and comparison points
+        - Express relationships and trends explicitly (e.g., "metric X increased by Y% from 2020 to 2021")
+        - Extract specific numerical values and preserve them exactly as shown
+        - Note any patterns, outliers, or significant findings visible in the data
+        - If the table shows comparisons (A vs B), state the differences clearly
+
+        INTEGRATION REQUIREMENTS:
+        - Connect table findings with supporting textual context from the surrounding paragraphs
+        - Clearly mark which data points come from tables vs. text for traceability
+        - Use phrases like "According to Table X..." or "The data shows..." for attribution
+        - Maintain logical flow between text summaries and table insights
+
+        CRITICAL CONSTRAINTS:
+        1. ACCURACY: Never invent, extrapolate, or assume data not explicitly shown
+        2. SPECIFICITY: Include ALL numerical values, percentages, and measurements exactly as presented
+        3. SEARCHABILITY: Use domain-specific terms, metric names, and entity names that appear in the original
+        4. COMPLETENESS: Don't omit important columns, rows, or comparisons from tables
+        5. CLARITY: Explain technical metrics and abbreviations found in tables
+
+        FORMAT YOUR OUTPUT AS:
+        [INTEGRATED SUMMARY]
+        [Summary of key findings from text]
+        [Detailed table insights with numerical data]
+        [Connections between text and tabular evidence]
+        [/INTEGRATED SUMMARY]
+
         CONTENT TO PROCESS:
         {context_str}
-        
-        OUTPUT (Searchable Summary):
+
+        OUTPUT (Comprehensive Searchable Summary):
         """
 
         try:

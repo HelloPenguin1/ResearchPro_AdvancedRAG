@@ -63,11 +63,8 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         
         compression_retriever = reranker.create_compression_retriever(hybrid_retriever)
         
-        
         rag_pipeline.set_compression_retriever(compression_retriever)
-        
         rag_pipeline.set_document_processor(document_processor)
-       
        
         # Update vectorstore
         if document_processor.vectorstore:
@@ -75,20 +72,25 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         else:
             raise HTTPException(status_code=500, detail="Vectorstore initialization failed")
         
-        
-        
+        # Create RAG chain
         rag_chain = rag_pipeline.create_rag_chain(compression_retriever)
         rag_pipeline.create_conversational_chain(rag_chain, session_manager.get_session_history)
 
         # Verify state
-        if not rag_pipeline.vectorstore or not rag_pipeline.hybrid_retriever:
-            raise HTTPException(status_code=500, detail="Failed to initialize retriever")
+        if not rag_pipeline.vectorstore or not rag_pipeline.hybrid_retriever or not rag_pipeline.conversational_rag:
+            raise HTTPException(status_code=500, detail="Failed to initialize RAG pipeline components")
 
         # Cleanup
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
 
-        return {"message": f"File uploaded and retriever initialized successfully."}
+        return {
+            "message": f"File uploaded and retriever initialized successfully.",
+            "stats": {
+                "documents": len(docs),
+                "tables": len(document_processor.extracted_tables)
+            }
+        }
     
     except HTTPException as he:
         if temp_file_path and os.path.exists(temp_file_path):

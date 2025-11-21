@@ -148,14 +148,21 @@ class RAG_Pipeline:
 
     def query(self, question: str, session_id: str) -> str:
         if not self.conversational_rag:
-            return "Conversational chain not initialized"
+            return "Error: Conversational chain not initialized"
 
         try:
+            # Inject table context if document processor available
+            enhanced_input = question
+            if self.document_processor and hasattr(self.document_processor, 'get_table_context'):
+                table_context = self.document_processor.get_table_context(question)
+                if table_context:
+                    enhanced_input = f"{question}{table_context}"
+            
             response = self.conversational_rag.invoke(
-                {"input": question},
+                {"input": enhanced_input},
                 config={"configurable": {"session_id": session_id}}
             )
             
-            return response['answer']
+            return response.get('answer', 'No response generated')
         except Exception as e:
             return f"Error processing query: {str(e)}"
