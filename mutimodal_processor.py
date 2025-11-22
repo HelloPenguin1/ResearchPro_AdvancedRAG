@@ -10,18 +10,65 @@ class MultimodalProcessor:
         self.llm = llm_summarize
 
     def load_and_process(self, filepath: str) -> list[Document]:
-        # 1. Partition with hi_res strategy (Essential for tables)
-        print("Partitioning document (this may take a while)...")
-        elements = partition_pdf(
+   
+        print("Fast scan to detect table/image pages...")
+        fast_scan = partition_pdf(
             filename=filepath,
-            strategy="hi_res",
-            infer_table_structure=True,
-            extract_image_block_types=["Image", "Table"],
-            extract_image_block_to_payload=True, 
+            strategy="fast",
+            infer_table_structure=False,
+            extract_image_block_types=None,
             languages=["eng"]
         )
+        pages_with_tables = set()
+
+        # Detect which pages need hi_res
+        for el in fast_scan:
+            category = getattr(el, "category", None)
+            text = getattr(el, "text", "") or ""
+            page = getattr(el.metadata, "page_number", None)
+
+            if page is None:
+                continue
+
+            if (
+                category in ("Table", "Image") or
+                "table" in text.lower() or
+                "figure" in text.lower()
+            ):
+                pages_with_tables.add(page)
+
+        print(f"Detected table/image pages: {sorted(list(pages_with_tables))}")
         
-        # 2. Smart Chunking (Respects document structure)
+        
+
+        # Step 2: If no tables/images → use fast output only
+        if not pages_with_tables:
+            print("No complex elements detected. Using fast scan for all pages.")
+            elements = fast_scan
+        else:
+            print("Running hi_res selectively on visual pages...")
+            hi_res_elements = partition_pdf(
+                    filename=filepath,
+                    strategy="hi_res",
+                    infer_table_structure=True,
+                    extract_image_block_types=["Table", "Image"],
+                    extract_image_block_to_payload=False,
+                    languages=["eng"],
+                    page_range=",".join(str(p) for p in pages_with_tables)
+                )
+           
+
+            # Merge
+            elements = []
+            for el in fast_scan:
+                page = getattr(el.metadata, "page_number", None)
+                if page in pages_with_tables:
+                    continue
+                elements.append(el)
+
+            elements.extend(list(hi_res_elements))
+
+        # Step 3: Chunking
         print("Chunking by title...")
         chunks = chunk_by_title(
             elements,
@@ -29,12 +76,14 @@ class MultimodalProcessor:
             new_after_n_chars=2400,
             combine_text_under_n_chars=500
         )
-        
-        # 3. AI Summarization of Tables/Images
-        print("Summarizing mixed content...")
-        documents = self._enrich_chunks_with_summaries(chunks)
-        
-        return documents
+
+        # Step 4: Convert to Document objects 
+        processed_docs = self._enrich_chunks_with_summaries(chunks)
+
+        return processed_docs
+    
+    
+    
 
     def _enrich_chunks_with_summaries(self, chunks) -> list[Document]:
         processed_docs = []
@@ -52,7 +101,7 @@ class MultimodalProcessor:
                 )
             else:
                 enhanced_text = content_data['text']
-                
+    
 
             doc = Document(
                 page_content=enhanced_text,
@@ -82,8 +131,7 @@ class MultimodalProcessor:
                     data['tables'].append(html)
                         
         return data
-    
-    
+
 
     
 

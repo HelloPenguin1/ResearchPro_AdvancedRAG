@@ -15,6 +15,12 @@ class DocumentProcessor:
         self.processed_docs = self.multimodal_processor.load_and_process(filepath)
         self.extracted_tables = self._extract_tables_from_docs(self.processed_docs)
         print(f"Generated {len(self.processed_docs)} enriched documents with {len(self.extracted_tables)} tables.")
+        print("Extracted tables:")
+        for i, t in enumerate(self.extracted_tables):
+            print(i, "Page:", "Preview:", t['content'][:100])
+            
+        
+
         return self.processed_docs
     
     def _extract_tables_from_docs(self, docs):
@@ -30,6 +36,7 @@ class DocumentProcessor:
                         'page_number': doc.metadata.get('page_number', 0),
                         'source': 'pdf'
                     })
+        
         return extracted_tables
 
     def create_retrievers(self, docs):
@@ -41,7 +48,7 @@ class DocumentProcessor:
         self.vectorstore = FAISS.from_documents(docs, hf_embeddings)
         semantic_retriever = self.vectorstore.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": 4}
+            search_kwargs={"k": 12}
         )
 
         # 2. Syntactic Retriever (Keyword Search)
@@ -50,7 +57,7 @@ class DocumentProcessor:
             documents=docs,
             preprocess_func=lambda text: text.lower().split()
         )
-        syntactic_retriever.k = 4
+        syntactic_retriever.k = 12
 
         return semantic_retriever, syntactic_retriever
 
