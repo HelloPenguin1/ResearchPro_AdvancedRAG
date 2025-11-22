@@ -13,7 +13,7 @@ class RAG_Pipeline:
         self.hybrid_retriever = None
         self.compression_retriever = None
         self.conversational_rag = None
-        
+        self.summary_cache = {}
         self.document_processor = None
         
         self.reformulation_prompt = self.create_reformulation_prompt()
@@ -158,14 +158,21 @@ class RAG_Pipeline:
             # Summarize table-containing chunks only
             summarized = []
             for doc in top_k:
+                
+                page = doc.metadata.get("page_number")
+                
                 if doc.metadata.get("has_tables"):
-                    summary = self.document_processor.multimodal_processor._generate_ai_summary(
-                        doc.page_content,
-                        doc.metadata.get("original_tables", []),
-                        []
-                    )
-                    summary = summary[:800]
-                    summarized.append(summary)
+                    if page in self.summary_cache:
+                        summary = self.summary_cache[page]
+                    else: 
+                        summary = self.document_processor.multimodal_processor._generate_ai_summary(
+                            doc.page_content[:800],
+                            doc.metadata.get("original_tables", []),
+                            []
+                        )
+                        self.summary_cache[page] = summary
+                    
+                    summarized.append(summary[:800])
                 else:
                     summarized.append(doc.page_content)
 

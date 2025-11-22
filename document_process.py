@@ -48,7 +48,7 @@ class DocumentProcessor:
         self.vectorstore = FAISS.from_documents(docs, hf_embeddings)
         semantic_retriever = self.vectorstore.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": 12}
+            search_kwargs={"k": 8}
         )
 
         # 2. Syntactic Retriever (Keyword Search)
@@ -57,7 +57,7 @@ class DocumentProcessor:
             documents=docs,
             preprocess_func=lambda text: text.lower().split()
         )
-        syntactic_retriever.k = 12
+        syntactic_retriever.k = 8
 
         return semantic_retriever, syntactic_retriever
 
