@@ -10,14 +10,9 @@ class MultimodalProcessor:
         self.llm = llm_summarize
 
     def load_and_process(self, filepath: str) -> list[Document]:
-   
         print("Fast scan to detect table/image pages...")
         fast_scan = partition_pdf(
-            filename=filepath,
-            strategy="fast",
-            infer_table_structure=False,
-            extract_image_block_types=None,
-            languages=["eng"]
+            filename=filepath,  strategy="fast", infer_table_structure=False, extract_image_block_types=None, languages=["eng"]
         )
         pages_with_tables = set()
 
@@ -29,7 +24,6 @@ class MultimodalProcessor:
 
             if page is None:
                 continue
-
             if (
                 category in ("Table", "Image") or
                 "table" in text.lower() or
@@ -40,6 +34,7 @@ class MultimodalProcessor:
         print(f"Detected table/image pages: {sorted(list(pages_with_tables))}")
         
         
+
 
         # Step 2: If no tables/images → use fast output only
         if not pages_with_tables:
@@ -78,116 +73,65 @@ class MultimodalProcessor:
         )
 
         # Step 4: Convert to Document objects 
-        processed_docs = self._enrich_chunks_with_summaries(chunks)
+        processed_docs = self._convert_chunks_without_summary(chunks)
 
         return processed_docs
     
     
     
 
-    def _enrich_chunks_with_summaries(self, chunks) -> list[Document]:
+    def _convert_chunks_without_summary(self, chunks) -> list[Document]:
+        """
+        Simple conversion: extract text + table HTML, no AI summarization.
+        """
         processed_docs = []
-    
+
         for chunk in chunks:
-            # Detect content types in this chunk
-            content_data = self._analyze_chunk_content(chunk)
-            
-            # If chunk has tables or images, generate a summary
-            if content_data['tables'] or content_data['images']:
-                enhanced_text = self._generate_ai_summary(
-                    content_data['text'],
-                    content_data['tables'],
-                    content_data['images']
-                )
-            else:
-                enhanced_text = content_data['text']
-    
+            text = chunk.text or ""
+
+            # Extract table HTML if present
+            tables = []
+            if hasattr(chunk, "metadata") and hasattr(chunk.metadata, "orig_elements"):
+                for element in chunk.metadata.orig_elements:
+                    if getattr(element, "category", None) == "Table":
+                        html = getattr(element.metadata, "text_as_html", element.text)
+                        tables.append(html)
 
             doc = Document(
-                page_content=enhanced_text,
+                page_content=text,
                 metadata={
                     "source": "pdf",
-                    "has_tables": len(content_data['tables']) > 0,
-                    "original_tables": content_data['tables'], 
-                    "page_number": chunk.metadata.page_number
+                    "has_tables": len(tables) > 0,
+                    "original_tables": tables,
+                    "page_number": getattr(chunk.metadata, "page_number", None),
                 }
             )
+
             processed_docs.append(doc)
-            
+
         return processed_docs
-    
-    
-    
-    
-    
-
-    def _analyze_chunk_content(self, chunk):
-        data = {'text': chunk.text, 'tables': [], 'images': []}
-        
-        if hasattr(chunk, 'metadata') and hasattr(chunk.metadata, 'orig_elements'):
-            for element in chunk.metadata.orig_elements:
-                if element.category == 'Table':
-                    html = getattr(element.metadata, 'text_as_html', element.text)
-                    data['tables'].append(html)
-                        
-        return data
-
 
     
 
     def _generate_ai_summary(self, text, tables, images) -> str:        
         # Construct context for the LLM
-        context_str = f"TEXT CONTENT:\n{text}\n\n"
+        context_str = f"TEXT:\n{text}\n\n"
         for i, table in enumerate(tables):
-            context_str += f"TABLE {i+1} DATA (HTML):\n{table}\n\n"
+            context_str += f"TABLE {i+1}:\n{table}\n\n"
 
-        prompt = f"""
-        You are an expert research analyst and technical writer specializing in precise data interpretation and document summarization.
+        prompt = f"""You are a concise research summarizer. Create a brief, searchable summary integrating text and tables.
 
-        TASK: Create a comprehensive, searchable summary that integrates text and tabular data with precision and clarity.
+        SUMMARY RULES:
+        - Extract core findings, methodology, and key results from text
+        - Convert tables to brief data statements with exact numbers (e.g., "Accuracy increased from 50% to 85%")
+        - Preserve domain terms and metric names for searchability
+        - Never invent data—only use what's explicitly shown
+        - Keep under 200 words; prioritize key insights over completeness
 
-        GUIDELINES FOR SUMMARIZATION:
-
-        TEXT ANALYSIS:
-        - Preserve the core arguments, findings, and conclusions from the text
-        - Extract and highlight the primary research question or objective
-        - Identify and include key methodologies and approaches mentioned
-        - Retain important qualifications, limitations, and caveats
-        - Use precise academic language; avoid over-simplification
-
-        TABLE ANALYSIS:
-        - Convert tabular data into clear, grammatically correct statements
-        - FOR EACH TABLE: Identify the key metrics, dimensions (rows/columns), and comparison points
-        - Express relationships and trends explicitly (e.g., "metric X increased by Y% from 2020 to 2021")
-        - Extract specific numerical values and preserve them exactly as shown
-        - Note any patterns, outliers, or significant findings visible in the data
-        - If the table shows comparisons (A vs B), state the differences clearly
-
-        INTEGRATION REQUIREMENTS:
-        - Connect table findings with supporting textual context from the surrounding paragraphs
-        - Clearly mark which data points come from tables vs. text for traceability
-        - Use phrases like "According to Table X..." or "The data shows..." for attribution
-        - Maintain logical flow between text summaries and table insights
-
-        CRITICAL CONSTRAINTS:
-        1. ACCURACY: Never invent, extrapolate, or assume data not explicitly shown
-        2. SPECIFICITY: Include ALL numerical values, percentages, and measurements exactly as presented
-        3. SEARCHABILITY: Use domain-specific terms, metric names, and entity names that appear in the original
-        4. COMPLETENESS: Don't omit important columns, rows, or comparisons from tables
-        5. CLARITY: Explain technical metrics and abbreviations found in tables
-
-        FORMAT YOUR OUTPUT AS:
-        [INTEGRATED SUMMARY]
-        [Summary of key findings from text]
-        [Detailed table insights with numerical data]
-        [Connections between text and tabular evidence]
-        [/INTEGRATED SUMMARY]
-
-        CONTENT TO PROCESS:
+        CONTENT:
         {context_str}
 
-        OUTPUT (Comprehensive Searchable Summary):
-        """
+        SUMMARY (direct, no formatting tags):"""
 
         try:
             response = self.llm.invoke([HumanMessage(content=prompt)])

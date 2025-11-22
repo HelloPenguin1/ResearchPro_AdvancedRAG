@@ -151,18 +151,35 @@ class RAG_Pipeline:
             return "Error: Conversational chain not initialized"
 
         try:
-            # Inject table context if document processor available
-            enhanced_input = question
-            if self.document_processor and hasattr(self.document_processor, 'get_table_context'):
-                table_context = self.document_processor.get_table_context(question)
-                if table_context:
-                    enhanced_input = f"{question}{table_context}"
-            
+            # Retrieve top-k documents
+            retrieved_docs = self.compression_retriever.get_relevant_documents(question)
+            top_k = retrieved_docs[:3]
+
+            # Summarize table-containing chunks only
+            summarized = []
+            for doc in top_k:
+                if doc.metadata.get("has_tables"):
+                    summary = self.document_processor.multimodal_processor._generate_ai_summary(
+                        doc.page_content,
+                        doc.metadata.get("original_tables", []),
+                        []
+                    )
+                    summary = summary[:800]
+                    summarized.append(summary)
+                else:
+                    summarized.append(doc.page_content)
+
+            # Build context
+            summarized_context = "\n\n".join(summarized)
+            enhanced_input = f"{question}\n\nSUMMARIZED CONTEXT:\n{summarized_context}"
+
+            # Run conversational RAG chain
             response = self.conversational_rag.invoke(
                 {"input": enhanced_input},
                 config={"configurable": {"session_id": session_id}}
             )
-            
-            return response.get('answer', 'No response generated')
+
+            return response.get("answer", "No response generated")  
+
         except Exception as e:
             return f"Error processing query: {str(e)}"
