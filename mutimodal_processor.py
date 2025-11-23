@@ -87,7 +87,6 @@ class MultimodalProcessor:
         return processed_docs
     
     
-    
 
     def describe_image(self, base64_img: str) -> str:
         
