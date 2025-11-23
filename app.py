@@ -74,7 +74,8 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
         
         # Create RAG chain
         rag_chain = rag_pipeline.create_rag_chain(compression_retriever)
-        rag_pipeline.create_conversational_chain(rag_chain, session_manager.get_session_history)
+        conversational_chain = rag_pipeline.create_conversational_chain(rag_chain, session_manager.get_session_history)
+        rag_pipeline.conversational_rag = conversational_chain
 
         # Verify state
         if not rag_pipeline.vectorstore or not rag_pipeline.hybrid_retriever or not rag_pipeline.conversational_rag:
@@ -88,7 +89,8 @@ async def upload_file(file: Annotated[UploadFile, File(description="Upload a tex
             "message": f"File uploaded and retriever initialized successfully.",
             "stats": {
                 "documents": len(docs),
-                "tables": len(document_processor.extracted_tables)
+                "tables": len(document_processor.extracted_tables),
+                "images": len(document_processor.extracted_images) if hasattr(document_processor, 'extracted_images') else 0
             }
         }
     
@@ -124,6 +126,8 @@ async def deletevectorstore():
         rag_pipeline.conversational_rag = None  
         if hasattr(document_processor, 'extracted_tables'):
             document_processor.extracted_tables = []
+        if hasattr(document_processor, 'extracted_images'):
+            document_processor.extracted_images = []
         session_manager.clear_all_sessions()
         return {"message": "Vectorstore and sessions cleared"}
     except Exception as e:

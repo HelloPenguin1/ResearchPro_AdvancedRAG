@@ -4,10 +4,16 @@ from langchain.schema import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 from config import llm_summarize
 import base64
+from unstructured.documents.elements import Image as UnstructuredImage
+from config import vision_model, groq_client
 
 class MultimodalProcessor:
     def __init__(self):
         self.llm = llm_summarize
+        self.vision_model = vision_model
+        self.groq_client = groq_client
+        self.image_cache = {}
+        
 
     def load_and_process(self, filepath: str) -> list[Document]:
         print("Fast scan to detect table/image pages...")
@@ -25,9 +31,12 @@ class MultimodalProcessor:
             if page is None:
                 continue
             if (
-                category in ("Table", "Image") or
-                "table" in text.lower() or
-                "figure" in text.lower()
+                category in ("Table", "Image", "Graphic", "Figure")
+                or "table" in text.lower()
+                or "figure" in text.lower()
+                or "chart" in text.lower()
+                or "diagram" in text.lower()
+                or "plot" in text.lower()
             ):
                 pages_with_tables.add(page)
 
@@ -46,8 +55,8 @@ class MultimodalProcessor:
                     filename=filepath,
                     strategy="hi_res",
                     infer_table_structure=True,
-                    extract_image_block_types=["Table", "Image"],
-                    extract_image_block_to_payload=False,
+                    extract_image_block_types=["Table", "Image", "Figure", "Graphic", "Plot"],
+                    extract_image_block_to_payload=True,
                     languages=["eng"],
                     page_range=",".join(str(p) for p in pages_with_tables)
                 )
@@ -80,22 +89,103 @@ class MultimodalProcessor:
     
     
 
-    def _convert_chunks_without_summary(self, chunks) -> list[Document]:
-        """
-        Simple conversion: extract text + table HTML, no AI summarization.
-        """
-        processed_docs = []
+    def describe_image(self, base64_img: str) -> str:
+        
+        if len(base64_img) > 2_000_000:
+            return "[Image too large to analyze]"
+        
+        if base64_img in self.image_cache:
+            return self.image_cache[base64_img]
+        
+        try:
+            # Clean base64 (same as test.py implicitly handles)
+            base64_img = base64_img.replace("\n", "").replace(" ", "")
+            base64_img = base64_img + "=" * (-len(base64_img) % 4)
+            if base64_img.startswith("iVBOR"):
+                mime = "image/png"
+            else:
+                mime = "image/jpeg"
 
+            image_url = f"data:{mime};base64,{base64_img}"
+
+            response = self.groq_client.chat.completions.create(
+                model=vision_model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Describe this image in detail."},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": image_url
+                                },
+                            },
+                        ],
+                    }
+                ]
+            )
+
+            desc = response.choices[0].message.content
+            self.image_cache[base64_img] = desc
+            return desc
+        
+        except Exception as e:
+            return "[Image could not be analyzed]"
+
+
+
+
+
+    def _convert_chunks_without_summary(self, chunks) -> list[Document]:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        processed_docs = []
+        
+        # Collect all images first
+        all_images_to_describe = []
+        for chunk in chunks:
+            if hasattr(chunk, "metadata") and hasattr(chunk.metadata, "orig_elements"):
+                for element in chunk.metadata.orig_elements:
+                    if isinstance(element, UnstructuredImage):
+                        if hasattr(element.metadata, "image_base64"):
+                            all_images_to_describe.append(element.metadata.image_base64)
+        
+        # Describe all images in parallel (max 4 concurrent)
+        image_descriptions = {}
+        if all_images_to_describe:
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                futures = {
+                    executor.submit(self.describe_image, img): img 
+                    for img in all_images_to_describe
+                }
+                for future in as_completed(futures):
+                    img = futures[future]
+                    try:
+                        image_descriptions[img] = future.result(timeout=30)
+                    except Exception:
+                        image_descriptions[img] = "[Image analysis failed]"
+        
+        # Now process chunks using pre-computed descriptions
         for chunk in chunks:
             text = chunk.text or ""
-
-            # Extract table HTML if present
             tables = []
+            images = []
+
             if hasattr(chunk, "metadata") and hasattr(chunk.metadata, "orig_elements"):
                 for element in chunk.metadata.orig_elements:
                     if getattr(element, "category", None) == "Table":
                         html = getattr(element.metadata, "text_as_html", element.text)
                         tables.append(html)
+                    elif isinstance(element, UnstructuredImage):
+                        if hasattr(element.metadata, "image_base64"):
+                            base64_img = element.metadata.image_base64
+                            # Use pre-computed description
+                            description = image_descriptions.get(base64_img, "[No description]")
+                            images.append({
+                                "base64": base64_img,
+                                "description": description
+                            })
 
             doc = Document(
                 page_content=text,
@@ -103,10 +193,12 @@ class MultimodalProcessor:
                     "source": "pdf",
                     "has_tables": len(tables) > 0,
                     "original_tables": tables,
+                    "has_images": len(images) > 0,
+                    "original_images": images,
+                    "image_description": [img["description"] for img in images],
                     "page_number": getattr(chunk.metadata, "page_number", None),
-                }
+                },
             )
-
             processed_docs.append(doc)
 
         return processed_docs
@@ -118,13 +210,20 @@ class MultimodalProcessor:
         context_str = f"TEXT:\n{text}\n\n"
         for i, table in enumerate(tables):
             context_str += f"TABLE {i+1}:\n{table}\n\n"
+    
+        if images:
+            context_str += f"\n[{len(images)} IMAGE(S) WITH DESCRIPTIONS]\n"
+            for i, img in enumerate(images, 1):
+                description = img.get("description", "No description available")
+                context_str += f"\nImage {i}: {description}\n"
 
-        prompt = f"""You are a concise research summarizer. Create a brief, searchable summary integrating text and tables.
+        prompt = f"""You are a concise research summarizer. Create a brief, searchable summary integrating text, tables, and visual elements.
 
         SUMMARY RULES:
         - Extract core findings, methodology, and key results from text
         - Convert tables to brief data statements with exact numbers (e.g., "Accuracy increased from 50% to 85%")
-        - Preserve domain terms and metric names for searchability
+        - Synthesize key insights from image descriptions—extract metrics, trends, and patterns
+        - Preserve domain terms, metric names, and visual insights for searchability
         - Never invent data—only use what's explicitly shown
         - Keep under 200 words; prioritize key insights over completeness
 

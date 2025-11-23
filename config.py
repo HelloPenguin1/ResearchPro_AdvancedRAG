@@ -2,6 +2,7 @@ from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chains import HypotheticalDocumentEmbedder
 import torch
+from groq import Groq
 
 import os
 from dotenv import load_dotenv
@@ -28,6 +29,9 @@ llm = ChatGroq(model="openai/gpt-oss-20b",
 llm_summarize = ChatGroq(model="llama-3.1-8b-instant", 
                groq_api_key=groq_api_key)
 
+
+vision_model = "meta-llama/llama-4-scout-17b-16e-instruct"
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 ##############################################################################################
 

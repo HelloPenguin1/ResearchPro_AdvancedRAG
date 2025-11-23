@@ -155,30 +155,44 @@ class RAG_Pipeline:
             retrieved_docs = self.compression_retriever.get_relevant_documents(question)
             top_k = retrieved_docs[:3]
 
-            # Summarize table-containing chunks only
+            # Summarize chunks with tables or images
             summarized = []
+            
             for doc in top_k:
-                
                 page = doc.metadata.get("page_number")
                 
-                if doc.metadata.get("has_tables"):
+                if doc.metadata.get("has_tables") or doc.metadata.get("has_images"):
                     if page in self.summary_cache:
                         summary = self.summary_cache[page]
                     else: 
                         summary = self.document_processor.multimodal_processor._generate_ai_summary(
                             doc.page_content[:800],
                             doc.metadata.get("original_tables", []),
-                            []
+                            doc.metadata.get("original_images", [])
                         )
                         self.summary_cache[page] = summary
                     
-                    summarized.append(summary[:800])
+                    if len(summary) > 600:
+                        summary = summary[:600]
+                    summarized.append(summary)
                 else:
                     summarized.append(doc.page_content)
 
             # Build context
             summarized_context = "\n\n".join(summarized)
             enhanced_input = f"{question}\n\nSUMMARIZED CONTEXT:\n{summarized_context}"
+            
+            # Inject table context
+            if self.document_processor and hasattr(self.document_processor, 'get_table_context'):
+                table_context = self.document_processor.get_table_context(question)
+                if table_context:
+                    enhanced_input += f"\n{table_context}"
+            
+            # Inject image context
+            if self.document_processor and hasattr(self.document_processor, 'get_image_context'):
+                image_context = self.document_processor.get_image_context(question)
+                if image_context:
+                    enhanced_input += f"\n{image_context}"
 
             # Run conversational RAG chain
             response = self.conversational_rag.invoke(
