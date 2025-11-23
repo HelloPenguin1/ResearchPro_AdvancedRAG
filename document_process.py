@@ -68,7 +68,7 @@ class DocumentProcessor:
         self.vectorstore = FAISS.from_documents(docs, hf_embeddings)
         semantic_retriever = self.vectorstore.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": 8}
+            search_kwargs={"k": 5}
         )
 
         # 2. Syntactic Retriever (Keyword Search)
@@ -77,7 +77,7 @@ class DocumentProcessor:
             documents=docs,
             preprocess_func=lambda text: text.lower().split()
         )
-        syntactic_retriever.k = 8
+        syntactic_retriever.k = 5
 
         return semantic_retriever, syntactic_retriever
 
@@ -127,6 +127,9 @@ class DocumentProcessor:
         for i, img in enumerate(self.extracted_images[:3], 1):
             page = img.get("page_number", "?")
             desc = img.get("description", "No analysis.")
+            desc = img.get("description", "No analysis.")
+            if len(desc) > 400:
+                desc = desc[:400] + "..."
 
             context += f"\n[Image {i} — Page {page}]\n{desc}\n"
 

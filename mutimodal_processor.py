@@ -126,6 +126,8 @@ class MultimodalProcessor:
             )
 
             desc = response.choices[0].message.content
+            if len(desc) > 500:
+                desc = desc[:500] + "..."
             self.image_cache[base64_img] = desc
             return desc
         
@@ -214,6 +216,8 @@ class MultimodalProcessor:
             context_str += f"\n[{len(images)} IMAGE(S) WITH DESCRIPTIONS]\n"
             for i, img in enumerate(images, 1):
                 description = img.get("description", "No description available")
+                if len(description) > 400:
+                    description = description[:400] + "..." 
                 context_str += f"\nImage {i}: {description}\n"
 
         prompt = f"""You are a concise research summarizer. Create a brief, searchable summary integrating text, tables, and visual elements.
